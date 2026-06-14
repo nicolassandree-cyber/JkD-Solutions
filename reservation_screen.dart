@@ -1,0 +1,175 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart'; // FIX: import manquant
+import 'package:uuid/uuid.dart';
+import '../providers/booking_provider.dart';
+import '../theme/app_theme.dart';
+import '../models/booking.dart';
+import 'p2p_screen.dart';
+
+class ReservationScreen extends StatefulWidget {
+  const ReservationScreen({Key? key}) : super(key: key);
+
+  @override
+  State<ReservationScreen> createState() => _ReservationScreenState();
+}
+
+class _ReservationScreenState extends State<ReservationScreen> {
+  String selectedType = "Studio (15–30m²)";
+  List<String> selectedOptions = [];
+  final nameController = TextEditingController();
+  final phoneController = TextEditingController();
+  final addressController = TextEditingController();
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    phoneController.dispose();
+    addressController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bp = Provider.of<BookingProvider>(context);
+    final double price = bp.calculatePrice(selectedType, selectedOptions);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          "Réserver une prestation",
+          style: GoogleFonts.playfairDisplay(),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSectionTitle("Type de logement"),
+            DropdownButton<String>(
+              isExpanded: true,
+              value: selectedType,
+              items: [
+                "Studio (15–30m²)",
+                "T2 (30–50m²)",
+                "T3 (50–70m²)",
+                "Maison (70–120m²)",
+              ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              onChanged: (v) => setState(() => selectedType = v!),
+            ),
+            const SizedBox(height: 20),
+            _buildSectionTitle("Options"),
+            _optionChip("Vitres"),
+            _optionChip("Cuisine (Four/Frigo)"),
+            _optionChip("Désinfection"),
+            const SizedBox(height: 30),
+            TextField(
+              controller: nameController,
+              decoration: _inputDeco("Nom complet"),
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              controller: phoneController,
+              decoration: _inputDeco("Téléphone"),
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              controller: addressController,
+              decoration: _inputDeco("Adresse à Tours"),
+            ),
+            const SizedBox(height: 40),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: JkdColors.grey,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("Estimation :", style: TextStyle(fontSize: 18)),
+                  Text(
+                    "${price.toStringAsFixed(2)} €",
+                    style: const TextStyle(
+                      fontSize: 24,
+                      color: JkdColors.gold,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                // FIX: construction du Booking + navigation vers P2PScreen
+                onPressed: () {
+                  if (nameController.text.isEmpty || addressController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Veuillez remplir tous les champs.")),
+                    );
+                    return;
+                  }
+
+                  final booking = Booking(
+                    id: const Uuid().v4(),
+                    clientName: nameController.text.trim(),
+                    phone: phoneController.text.trim(),
+                    address: addressController.text.trim(),
+                    serviceType: selectedType,
+                    date: DateTime.now(),
+                    options: List.from(selectedOptions),
+                    totalPrice: price,
+                  );
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => P2PScreen(bookingToSend: booking),
+                    ),
+                  );
+                },
+                child: const Text("PARTAGER MA DEMANDE (P2P)"),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Text(
+        title,
+        style: const TextStyle(color: JkdColors.gold, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  InputDecoration _inputDeco(String hint) => InputDecoration(
+        labelText: hint,
+        border: const OutlineInputBorder(),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: JkdColors.gold.withOpacity(0.5)),
+        ),
+      );
+
+  Widget _optionChip(String label) {
+    final bool isSelected = selectedOptions.contains(label);
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (val) {
+        setState(() {
+          val ? selectedOptions.add(label) : selectedOptions.remove(label);
+        });
+      },
+    );
+  }
+}
